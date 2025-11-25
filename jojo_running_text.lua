@@ -1,22 +1,144 @@
 --==================================================
---  JOJO RUNNING TEXT - LITE + SIMPLE KEY
---  MOBILE + AUTO COLOR + PAUSE + 10 LINES + MINIMIZE
+--  JOJO RUNNING TEXT - LICENSE + skrip_key (NO INPUT)
+--  Cara pakai di executor:
+--  getgenv().skrip_key = "KEY-KAMU-15CHR"
+--  loadstring(game:HttpGet("https://raw.githubusercontent.com/jadullalu/jojo-running-text/refs/heads/main/jojo_running_text.lua"))()
 --==================================================
-
-local REQUIRED_KEY = "JOJO-TEXT-123"  -- <<< GANTI KEY DI SINI
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
 local speaker = Players.LocalPlayer
 local PlayerGui = speaker:WaitForChild("PlayerGui")
 
-----------------------------------------------------
--- FUNGSI UI UTAMA (SCRIPT KAMU YANG LITE)
-----------------------------------------------------
-local function startMainUI()
-    --==================== MAIN GUI ====================
+-- Bersihin GUI lama biar gak numpuk
+do
+    for _, name in ipairs({
+        "JojoKeyGui",
+        "JojoRunningTextLiteMobile",
+        "RunningTextGui"
+    }) do
+        local g = PlayerGui:FindFirstChild(name)
+        if g then g:Destroy() end
+    end
+end
 
+--==================== CONFIG LICENSE ====================
+
+local LICENSE_URL = "http://103.253.27.226:8088/api/check_key"
+
+local function notify(title, text, dur)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = title or "JoJo";
+            Text  = text or "";
+            Duration = dur or 4;
+        })
+    end)
+end
+
+local function trim(s)
+    return (s:match("^%s*(.-)%s*$"))
+end
+
+local function getHWID()
+    local hwid = "UNKNOWN"
+
+    if typeof(gethwid) == "function" then
+        local ok, res = pcall(gethwid)
+        if ok and res then
+            hwid = tostring(res)
+        end
+    elseif typeof(getdeviceid) == "function" then
+        local ok, res = pcall(getdeviceid)
+        if ok and res then
+            hwid = tostring(res)
+        end
+    else
+        hwid = "USERID_" .. tostring(speaker.UserId)
+    end
+
+    return hwid
+end
+
+local function verifyKeyToServer(inputKey)
+    local hwid = getHWID()
+
+    local url = string.format(
+        "%s?key=%s&hwid=%s",
+        LICENSE_URL,
+        HttpService:UrlEncode(inputKey),
+        HttpService:UrlEncode(hwid)
+    )
+
+    local ok, body = pcall(function()
+        return game:HttpGet(url)
+    end)
+
+    if not ok then
+        return false, "Gagal konek server lisensi."
+    end
+
+    local data
+    local ok2 = pcall(function()
+        data = HttpService:JSONDecode(body)
+    end)
+
+    if not ok2 or type(data) ~= "table" then
+        return false, "Respon server tidak valid."
+    end
+
+    if data.status == "OK" then
+        if data.bind then
+            return true, "Key valid (dibind ke device ini)."
+        else
+            return true, "Key valid."
+        end
+    elseif data.status == "LOCKED" then
+        return false, "Key sudah dipakai di device lain."
+    else
+        return false, "Key tidak valid."
+    end
+end
+
+--==================== AMBIL KEY DARI getgenv().skrip_key ====================
+
+local userKey = nil
+
+pcall(function()
+    if typeof(getgenv) == "function" then
+        local env = getgenv()
+        if type(env.skrip_key) == "string" then
+            userKey = trim(env.skrip_key)
+        end
+    end
+end)
+
+if not userKey or userKey == "" then
+    notify("JoJo Running Text", "skrip_key kosong.\nSet dulu: getgenv().skrip_key = \"KEYMU\"")
+    return
+end
+
+-- opsional: cek panjang kira2 15 char (boleh kamu ubah)
+if #userKey < 8 or #userKey > 32 then
+    notify("JoJo Running Text", "Format skrip_key tidak sesuai.")
+    return
+end
+
+local okLicense, msgLicense = verifyKeyToServer(userKey)
+if not okLicense then
+    notify("JoJo License", msgLicense or "Key tidak valid.")
+    return
+end
+
+notify("JoJo License", msgLicense or "Key OK.", 3)
+
+--==================================================
+--  MAIN UI RUNNING TEXT LITE (MOBILE)
+--==================================================
+
+local function startMainUI()
     local main = Instance.new("ScreenGui")
     main.Name = "JojoRunningTextLiteMobile"
     main.ResetOnSpawn = false
@@ -41,8 +163,7 @@ local function startMainUI()
     frameCorner.CornerRadius = UDim.new(0, 10)
     frameCorner.Parent = Frame
 
-    --==================== TITLE ====================
-
+    -- TITLE
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Parent = Frame
     TitleLabel.BackgroundTransparency = 1
@@ -54,8 +175,7 @@ local function startMainUI()
     TitleLabel.TextSize = 18
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- CLOSE BUTTON
-
+    -- CLOSE
     local closebutton = Instance.new("TextButton")
     closebutton.Name = "Close"
     closebutton.Parent = Frame
@@ -72,8 +192,7 @@ local function startMainUI()
     closeCorner.CornerRadius = UDim.new(0, 6)
     closeCorner.Parent = closebutton
 
-    -- MINIMIZE BUTTON
-
+    -- MINIMIZE
     local miniButton = Instance.new("TextButton")
     miniButton.Name = "Minimize"
     miniButton.Parent = Frame
@@ -90,8 +209,7 @@ local function startMainUI()
     miniCorner.CornerRadius = UDim.new(0, 6)
     miniCorner.Parent = miniButton
 
-    --==================== RUNNING TEXT SWITCH ====================
-
+    -- RUNNING TEXT SWITCH
     local rtTitleLabel = Instance.new("TextLabel")
     rtTitleLabel.Parent = Frame
     rtTitleLabel.BackgroundTransparency = 1
@@ -144,8 +262,7 @@ local function startMainUI()
     rtSwitchKnobCorner.CornerRadius = UDim.new(1, 0)
     rtSwitchKnobCorner.Parent = rtSwitchKnob
 
-    --==================== INPUT PESAN ====================
-
+    -- TEXTBOX PESAN (sampai 10 line)
     local rtMessageBox = Instance.new("TextBox")
     rtMessageBox.Name = "RT_Message"
     rtMessageBox.Parent = Frame
@@ -167,8 +284,7 @@ local function startMainUI()
     rtMsgCorner.CornerRadius = UDim.new(0, 6)
     rtMsgCorner.Parent = rtMessageBox
 
-    --==================== SIZE / SPEED / PAUSE ====================
-
+    -- SIZE / SPEED / PAUSE ROW
     local sizeRowY = 148
 
     local rtSizeBox = Instance.new("TextBox")
@@ -243,8 +359,7 @@ local function startMainUI()
     pauseCorner.CornerRadius = UDim.new(0, 6)
     pauseCorner.Parent = pauseButton
 
-    --==================== POSISI (TOP / MID / BOT) ====================
-
+    -- POSISI (TOP/MID/BOT)
     local posRowY = 176
 
     local posLabel = Instance.new("TextLabel")
@@ -282,8 +397,7 @@ local function startMainUI()
         posButtons[name] = btn
     end
 
-    --==================== GUI OVERLAY RUNNING TEXT ====================
-
+    -- OVERLAY RUNNING TEXT
     local rtGui = Instance.new("ScreenGui")
     rtGui.Name = "RunningTextGui"
     rtGui.ResetOnSpawn = false
@@ -303,8 +417,7 @@ local function startMainUI()
     rtLabel.TextYAlignment = Enum.TextYAlignment.Center
     rtLabel.TextWrapped = true
 
-    --==================== VARIABEL ====================
-
+    -- VARIABEL
     local rtEnabled = false
     local rtPaused = false
     local rtSpeed = 100
@@ -326,8 +439,7 @@ local function startMainUI()
     local colorTimer = 0
     local colorInterval = 0.6
 
-    --==================== FUNGSI BANTU ====================
-
+    -- FUNGSI BANTU
     local function applyRTSwitchVisual()
         if rtEnabled then
             rtSwitchBack.BackgroundColor3 = Color3.fromRGB(80, 190, 120)
@@ -382,8 +494,7 @@ local function startMainUI()
         pauseButton.Visible = state
     end
 
-    --==================== POSISI BUTTON CLICK ====================
-
+    -- POS BUTTON
     for i, name in ipairs(posNames) do
         local btn = posButtons[name]
         local anchor = posAnchors[i]
@@ -396,8 +507,7 @@ local function startMainUI()
 
     setPosButtonsVisual("Mid")
 
-    --==================== PAUSE BUTTON LOGIC ====================
-
+    -- PAUSE
     pauseButton.MouseButton1Click:Connect(function()
         rtPaused = not rtPaused
         if rtPaused then
@@ -409,8 +519,7 @@ local function startMainUI()
         end
     end)
 
-    --==================== MINIMIZE BUTTON LOGIC ====================
-
+    -- MINIMIZE
     miniButton.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
@@ -424,8 +533,7 @@ local function startMainUI()
         end
     end)
 
-    --==================== TOGGLE RUNNING TEXT ====================
-
+    -- TOGGLE RUNNING TEXT
     rtToggleButton.MouseButton1Click:Connect(function()
         rtEnabled = not rtEnabled
         applyRTSwitchVisual()
@@ -445,8 +553,7 @@ local function startMainUI()
         end
     end)
 
-    --==================== GERAKAN + AUTO COLOR ====================
-
+    -- MOVEMENT + AUTO COLOR
     RunService.RenderStepped:Connect(function(dt)
         if rtEnabled and rtLabel.Visible then
             local cam = workspace.CurrentCamera
@@ -476,8 +583,7 @@ local function startMainUI()
         end
     end)
 
-    --==================== UPDATE SETTING SAAT INPUT ====================
-
+    -- UPDATE SETTING SAAT INPUT SELESAI
     rtSizeBox.FocusLost:Connect(function()
         if rtEnabled then
             updateRTSettings()
@@ -496,8 +602,7 @@ local function startMainUI()
         end
     end)
 
-    --==================== CLOSE ====================
-
+    -- CLOSE
     closebutton.MouseButton1Click:Connect(function()
         main:Destroy()
         rtGui:Destroy()
@@ -506,132 +611,8 @@ local function startMainUI()
     applyRTSwitchVisual()
     setMainContentVisible(true)
 
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", { 
-            Title = "JoJo Running Text LITE";
-            Text = "UI rapi + auto color + pause + 10 lines + minimize siap.";
-            Duration = 4;
-        })
-    end)
+    notify("JoJo Running Text LITE", "UI siap dipakai.", 3)
 end
 
-----------------------------------------------------
--- AUTO-BYPASS JIKA KEY DARI LOADER BENAR
-----------------------------------------------------
-local autoKey = rawget(_G, "JOJO_RT_KEY")
-if autoKey and autoKey == REQUIRED_KEY then
-    startMainUI()
-    return
-end
-
-----------------------------------------------------
--- POPUP KEY (UNTUK YANG TIDAK PAKAI LOADER)
-----------------------------------------------------
-
-local function trim(s)
-    return (s:match("^%s*(.-)%s*$"))
-end
-
-local keyGui = Instance.new("ScreenGui")
-keyGui.Name = "JojoKeyUI"
-keyGui.ResetOnSpawn = false
-keyGui.Parent = PlayerGui
-
-local keyFrame = Instance.new("Frame")
-keyFrame.Parent = keyGui
-keyFrame.Name = "KeyFrame"
-keyFrame.BackgroundColor3 = Color3.fromRGB(26, 27, 35)
-keyFrame.BackgroundTransparency = 0.1
-keyFrame.BorderSizePixel = 0
-keyFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-keyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-keyFrame.Size = UDim2.new(0, 260, 0, 140)
-keyFrame.Active = true
-keyFrame.Draggable = true
-
-local keyCorner = Instance.new("UICorner")
-keyCorner.CornerRadius = UDim.new(0, 10)
-keyCorner.Parent = keyFrame
-
-local keyTitle = Instance.new("TextLabel")
-keyTitle.Parent = keyFrame
-keyTitle.BackgroundTransparency = 1
-keyTitle.Position = UDim2.new(0, 12, 0, 8)
-keyTitle.Size = UDim2.new(1, -24, 0, 22)
-keyTitle.Font = Enum.Font.SourceSansBold
-keyTitle.Text = "JOJO Running Text - KEY"
-keyTitle.TextColor3 = Color3.fromRGB(230, 235, 255)
-keyTitle.TextSize = 16
-keyTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-local keyBox = Instance.new("TextBox")
-keyBox.Parent = keyFrame
-keyBox.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
-keyBox.BorderSizePixel = 0
-keyBox.Position = UDim2.new(0, 12, 0, 40)
-keyBox.Size = UDim2.new(1, -24, 0, 28)
-keyBox.Font = Enum.Font.SourceSans
-keyBox.PlaceholderText = "Masukkan key di sini..."
-keyBox.Text = ""
-keyBox.TextColor3 = Color3.fromRGB(230, 235, 255)
-keyBox.TextSize = 14
-keyBox.ClearTextOnFocus = false
-
-local keyBoxCorner = Instance.new("UICorner")
-keyBoxCorner.CornerRadius = UDim.new(0, 6)
-keyBoxCorner.Parent = keyBox
-
-local keyButton = Instance.new("TextButton")
-keyButton.Parent = keyFrame
-keyButton.BackgroundColor3 = Color3.fromRGB(90, 150, 220)
-keyButton.BorderSizePixel = 0
-keyButton.Position = UDim2.new(0, 12, 0, 76)
-keyButton.Size = UDim2.new(1, -24, 0, 26)
-keyButton.Font = Enum.Font.SourceSansBold
-keyButton.Text = "UNLOCK"
-keyButton.TextSize = 14
-keyButton.TextColor3 = Color3.fromRGB(10, 15, 20)
-
-local keyButtonCorner = Instance.new("UICorner")
-keyButtonCorner.CornerRadius = UDim.new(0, 6)
-keyButtonCorner.Parent = keyButton
-
-local keyStatus = Instance.new("TextLabel")
-keyStatus.Parent = keyFrame
-keyStatus.BackgroundTransparency = 1
-keyStatus.Position = UDim2.new(0, 12, 0, 108)
-keyStatus.Size = UDim2.new(1, -24, 0, 20)
-keyStatus.Font = Enum.Font.SourceSans
-keyStatus.Text = ""
-keyStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
-keyStatus.TextSize = 14
-keyStatus.TextXAlignment = Enum.TextXAlignment.Left
-
-local function tryCheckKey()
-    local input = trim(keyBox.Text or "")
-    if input == "" then
-        keyStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
-        keyStatus.Text = "Key kosong."
-        return
-    end
-
-    if input == REQUIRED_KEY then
-        keyStatus.TextColor3 = Color3.fromRGB(120, 220, 130)
-        keyStatus.Text = "Key valid. Membuka UI..."
-        task.delay(0.3, function()
-            keyGui:Destroy()
-            startMainUI()
-        end)
-    else
-        keyStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
-        keyStatus.Text = "Key salah."
-    end
-end
-
-keyButton.MouseButton1Click:Connect(tryCheckKey)
-
-keyBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        tryCheckKey()
-    end
-end)
+-- Jalankan UI setelah license OK
+startMainUI()
